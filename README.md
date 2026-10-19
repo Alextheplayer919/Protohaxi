@@ -23,16 +23,28 @@ so each module was rewritten against `dev.sora.relay`: WClient's `beforePacketBo
 | Category | Modules |
 |---|---|
 | Combat | AntiKnockback, AutoTotem, Hitbox, HotbarSwitcher, InfiniteAura, TriggerBot |
-| Movement | AbilityFly, AntiAFK, AutoWalk, Bhop, Boost, HighJump, JetPack, MultiJump, NoClip, Spider, Sprint |
+| Movement | MotionFly, AntiAFK, AutoWalk, Bhop, Boost, HighJump, JetPack, MultiJump, NoClip, Spider, Sprint |
 | Visual | Fullbright, TimeShift, Zoom |
 | Misc | AntiDebuff, AutoDisconnect, ChatSpam, ChatSuffix, Desync, FakeDeath, NoChat, PositionLogger |
 
-Four names differ from WClient's because the ProtoHax library already uses them: `AbilityFly`
-(WClient `fly`), `Boost` (`speed`), `MultiJump` (`air_jump`) and `ChatSpam` (`Spammer`).
+Three names differ from WClient's because the ProtoHax library already uses them:
+`Boost` (`speed`), `MultiJump` (`air_jump`) and `ChatSpam` (`Spammer`).
 
-Two ports deliberately differ from the original:
+Ports that deliberately differ from the original:
 
-* **AbilityFly / NoClip** keep WClient's approach - the server never grants anything, the relay
+* **MotionFly replaces fly.** The old fly modules - WClient's ability fly (this app's former
+  `AbilityFly`) and the bundled library's `Fly` (removed from the module list in
+  `MinecraftRelay.registerAdditionalModules`) - both tell the game it has the fly ability via
+  `UpdateAbilitiesPacket`. Servers, anarchy servers included, patch exactly that: the server
+  never granted the ability, so the flight that follows gets flagged and rubberbanded.
+  `MotionFly` (a port of the LeHu/Testfly style) never touches abilities: it reads the move
+  vector, yaw and jump/sneak inputs from the outgoing `PlayerAuthInputPacket`, turns them
+  into a per-tick velocity (speeds in BPS / 20, horizontal capped at sqrt(5.99) blocks/tick)
+  and sends it to the game as a client-bound `SetEntityMotionPacket`. It keeps the original's
+  anti-rubberband distance check (a >4.5 block position jump is treated as a setback and
+  skipped) and a collision guard fed by the client's own `HORIZONTAL_COLLISION` /
+  `VERTICAL_COLLISION` input flags. Hold jump to climb, sneak to descend, glide -0.02 by default.
+* **NoClip** keeps WClient's approach - the server never grants anything, the relay
   drops the abilities the server sends down and the ability requests the game sends up, and feeds
   the game its own `UpdateAbilitiesPacket`. The shared plumbing is in
   `modules/util/Abilities.kt` and `modules/motion/ModuleAbilityBase.kt`.

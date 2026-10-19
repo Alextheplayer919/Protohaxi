@@ -13,15 +13,18 @@ import org.cloudburstmc.protocol.bedrock.packet.RequestAbilityPacket
 import org.cloudburstmc.protocol.bedrock.packet.UpdateAbilitiesPacket
 
 /**
- * Shared plumbing of the two ability modules, ported from WClient's `FlyModule` and
- * `NoClipModule`.
+ * Shared plumbing of the ability modules, ported from WClient's `NoClipModule`
+ * (and its former `FlyModule`).
  *
- * Both work the same way, and it is the reason they survive on 2b2t: the server never
- * grants anything and never hears a request. The relay drops the abilities the server
- * sends down and the ability requests the game sends up, and feeds the game its own
- * `UpdateAbilitiesPacket` - operator permissions plus one extra ability. The server only
- * ever sees the resulting movement, which is exactly what an ordinary client that was
- * given fly by a plugin would produce.
+ * The relay drops the abilities the server sends down and the ability requests the
+ * game sends up, and feeds the game its own `UpdateAbilitiesPacket` - operator
+ * permissions plus one extra ability. The server only ever sees the resulting
+ * movement.
+ *
+ * Only `NoClip` still uses this: fly moved to [ModuleMotionFly], because sustained
+ * flight from a player the server never gave the fly ability is exactly what
+ * movement checks flag. NoClip keeps the ability method - there is no motion-only
+ * way to stop the client colliding with blocks.
  */
 abstract class ModuleAbilityBase(
 	name: String,

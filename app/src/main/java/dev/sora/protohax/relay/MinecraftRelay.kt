@@ -21,7 +21,7 @@ import dev.sora.protohax.relay.modules.misc.ModuleDesync
 import dev.sora.protohax.relay.modules.misc.ModuleFakeDeath
 import dev.sora.protohax.relay.modules.misc.ModuleNoChat
 import dev.sora.protohax.relay.modules.misc.ModulePositionLogger
-import dev.sora.protohax.relay.modules.motion.ModuleAbilityFly
+import dev.sora.protohax.relay.modules.motion.ModuleMotionFly
 import dev.sora.protohax.relay.modules.motion.ModuleAntiAFK
 import dev.sora.protohax.relay.modules.motion.ModuleAutoWalk
 import dev.sora.protohax.relay.modules.motion.ModuleBhop
@@ -167,8 +167,9 @@ object MinecraftRelay {
 	 * - WClient has its own session model - but keep WClient's behaviour and settings.
 	 *
 	 * A few names differ from WClient's because the bundled library already uses them
-	 * (`Fly`, `Speed`, `AirJump`, `Spammer`): `AbilityFly`, `Boost`, `MultiJump` and
-	 * `ChatSpam` are WClient's `fly`, `speed`, `air_jump` and `Spammer`.
+	 * (`Speed`, `AirJump`, `Spammer`): `Boost`, `MultiJump` and `ChatSpam` are
+	 * WClient's `speed`, `air_jump` and `Spammer`. Fly is [ModuleMotionFly] instead -
+	 * it replaces both WClient's ability fly and the library's `Fly`.
 	 */
 	private fun registerAdditionalModules(moduleManager: ModuleManager) {
 		moduleManager.registerModule(ModuleESP())
@@ -182,7 +183,12 @@ object MinecraftRelay {
 		moduleManager.registerModule(ModuleTriggerBot())
 
 		// movement
-		moduleManager.registerModule(ModuleAbilityFly())
+		// MotionFly replaces the fly modules: the bundled library's ability-based
+		// `Fly` is removed from the list (it stays inert - it can never be toggled),
+		// and this app's old `AbilityFly` is gone. MotionFly never touches abilities;
+		// see its class doc for why the ability method is the patched one.
+		moduleManager.modules.removeAll { it.name == "Fly" }
+		moduleManager.registerModule(ModuleMotionFly())
 		moduleManager.registerModule(ModuleAntiAFK())
 		moduleManager.registerModule(ModuleAutoWalk())
 		moduleManager.registerModule(ModuleBhop())
