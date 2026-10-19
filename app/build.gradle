@@ -1,0 +1,144 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'com.google.gms.google-services'
+    id 'com.google.firebase.crashlytics'
+}
+
+// ====================================================================================================
+// Signing
+// ====================================================================================================
+//
+//   * `keystore.properties` in the repository root (NOT committed, see .gitignore) makes the release
+//     build use a real release key:  storeFile, storePassword, keyAlias, keyPassword.
+//     `storeFile` may be absolute or relative to the repository root.
+//   * without it, the release build is signed with the Android debug keystore, which is what
+//     GitHub Actions produces - that APK installs fine for side-loading/testing, but put a real
+//     key in keystore.properties before distributing it widely.
+
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def hasReleaseKeystore = keystorePropertiesFile.exists()
+def releaseKeystoreProperties = new Properties()
+if (hasReleaseKeystore) {
+    keystorePropertiesFile.withInputStream { releaseKeystoreProperties.load(it) }
+}
+
+// What will sign the release APK.
+def signingStoreFile
+def signingStorePass
+def signingKeyAlias
+def signingKeyPass
+if (hasReleaseKeystore) {
+    signingStoreFile = rootProject.file(releaseKeystoreProperties['storeFile'])
+    signingStorePass = releaseKeystoreProperties['storePassword']
+    signingKeyAlias = releaseKeystoreProperties['keyAlias']
+    signingKeyPass = releaseKeystoreProperties['keyPassword']
+} else {
+    // The same default the Android Gradle plugin uses for its own debug signing config.
+    signingStoreFile = new File(System.getProperty('user.home'), '.android/debug.keystore')
+    signingStorePass = 'android'
+    signingKeyAlias = 'androiddebugkey'
+    signingKeyPass = 'android'
+}
+
+android {
+    namespace 'dev.sora.protohax'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'dev.sora.protohax'
+        minSdk 28
+        targetSdk 34
+        versionCode 3
+        versionName '1.4.2'
+
+        vectorDrawables {
+            useSupportLibrary true
+        }
+
+        ndk {
+            abiFilters 'arm64-v8a', 'x86_64'
+        }
+    }
+    buildFeatures {
+        compose true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion compose_compiler_version
+    }
+    if (hasReleaseKeystore) {
+        signingConfigs {
+            release {
+                storeFile signingStoreFile
+                storePassword signingStorePass
+                keyAlias signingKeyAlias
+                keyPassword signingKeyPass
+            }
+        }
+    }
+    buildTypes {
+        release {
+            shrinkResources true
+            minifyEnabled true
+            zipAlignEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+    compileOptions {
+        sourceCompatibility '21'
+        targetCompatibility '21'
+    }
+    kotlinOptions {
+        jvmTarget = '21'
+    }
+    packagingOptions {
+        resources {
+            excludes += '/META-INF/**'
+            excludes += '/kotlin/**'
+            excludes += '/DebugProbesKt.bin'
+            excludes += '/kotlin-tooling-metadata.json'
+        }
+        jniLibs.useLegacyPackaging true
+    }
+    configurations {
+        all {
+            resolutionStrategy {
+                // exclude duplicate classes
+                exclude group: 'com.google.guava', module: 'listenablefuture'
+                exclude group: 'com.google.errorprone', module: 'error_prone_annotations'
+                // The bundled ProtoHax jar already contains Gson (2.10) - that is the one the rest of
+                // this app compiles and runs against - and two copies of com.google.gson.* in one APK
+                // fail the build's duplicate-class check.
+                exclude group: 'com.google.code.gson', module: 'gson'
+            }
+        }
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['ProtoHax-1.4.0.jar'])
+    implementation 'dev.sora.networking:libmitm:1.2.3-raknet'
+
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.2'
+
+    implementation 'androidx.core:core-ktx:1.10.1'
+    implementation 'androidx.activity:activity-compose:1.7.2'
+    implementation "androidx.compose.ui:ui:$compose_version"
+    implementation "androidx.compose.material3:material3:$compose_material_version"
+    implementation "androidx.compose.material3:material3-window-size-class:$compose_material_version"
+    implementation "androidx.compose.material:material-icons-extended:$compose_version"
+    implementation 'androidx.navigation:navigation-compose:2.6.0'
+
+    implementation "com.google.accompanist:accompanist-navigation-animation:$accompanist_version"
+    implementation "com.google.accompanist:accompanist-adaptive:$accompanist_version"
+    implementation "com.google.accompanist:accompanist-systemuicontroller:$accompanist_version"
+    implementation "com.google.accompanist:accompanist-drawablepainter:$accompanist_version"
+
+    implementation 'org.luaj:luaj-jse:3.0.1'
+    implementation 'com.google.firebase:firebase-crashlytics:18.3.7'
+    implementation 'com.google.firebase:firebase-analytics:21.3.0'
+
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation fileTree(dir: 'libs', include: ['ProtoHax-1.4.0.jar'])
+}
