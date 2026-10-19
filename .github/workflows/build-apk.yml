@@ -1,0 +1,92 @@
+name: Build APK
+
+# Builds an installable APK and uploads it as a downloadable artifact.
+#
+# How to get your APK:
+#   1. Push to any branch (or: Actions -> "Build APK" -> "Run workflow").
+#   2. Open the finished run.
+#   3. Download the "ProtoHax-APK" artifact at the bottom of the run page
+#      and unzip it - it contains app-release.apk (and app-debug.apk).
+#
+# The release APK is signed with the Android debug keystore (see
+# app/build.gradle) so it installs directly for side-loading/testing.
+# Add a keystore.properties in the repo root for a real release key.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Show Java version
+        run: |
+          java -version
+          javac -version
+
+      - name: Check vendored ProtoHax jar is present
+        run: |
+          set -e
+          ls -lh app/libs/ProtoHax-1.4.0.jar
+          test -f app/libs/ProtoHax-1.4.0.jar
+
+      - name: Grant Gradle permission
+        run: chmod +x gradlew
+
+      - name: Build release and debug APKs
+        run: |
+          ./gradlew app:assembleRelease app:assembleDebug \
+            --stacktrace \
+            --no-daemon
+
+      - name: Verify APKs
+        run: |
+          set -e
+          echo "Release APK:"
+          ls -lh app/build/outputs/apk/release/app-release.apk
+          test -f app/build/outputs/apk/release/app-release.apk
+
+          echo
+          echo "Debug APK:"
+          ls -lh app/build/outputs/apk/debug/app-debug.apk
+          test -f app/build/outputs/apk/debug/app-debug.apk
+
+          echo
+          echo "Sanity check (dex + manifest inside the release APK):"
+          unzip -l app/build/outputs/apk/release/app-release.apk | grep -E 'classes.*\.dex|AndroidManifest.xml' || true
+
+          echo
+          echo "APKs built successfully."
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ProtoHax-APK
+          path: |
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true
